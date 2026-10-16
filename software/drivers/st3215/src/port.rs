@@ -514,6 +514,7 @@ impl St3215Port {
         let started = Instant::now();
         let result = read_req.async_readwrite(port, ST3215_TIMEOUT_MS).await;
         let elapsed_ms = started.elapsed().as_millis();
+        read_stats(started.elapsed().as_micros() as u64, result.is_ok());
         if elapsed_ms >= ST3215_SLOW_READ_WARN_MS {
             warn!("ST3215 slow read_motor_config: bus={} motor={} elapsed={}ms", bus_serial, motor_id, elapsed_ms);
         }
@@ -539,6 +540,7 @@ impl St3215Port {
         let started = Instant::now();
         let result = read_req.async_readwrite(port, ST3215_TIMEOUT_MS).await;
         let elapsed_ms = started.elapsed().as_millis();
+        read_stats(started.elapsed().as_micros() as u64, result.is_ok());
         if elapsed_ms >= ST3215_SLOW_READ_WARN_MS {
             warn!("ST3215 slow read_motor_ram: bus={} motor={} elapsed={}ms", bus_serial, motor_id, elapsed_ms);
         }
@@ -1397,4 +1399,25 @@ impl TxEnvelope {
             None
         }
     }
+}
+
+// Test only: read time percentiles over all motors, logged every 10 s.
+fn read_stats(us: u64, ok: bool) {
+    static STATS: Mutex<Option<(Instant, Vec<u64>, usize)>> = parking_lot::const_mutex(None);
+    let mut guard = STATS.lock();
+    let (since, times, failed) = guard.get_or_insert_with(|| (Instant::now(), Vec::new(), 0));
+    times.push(us);
+    if !ok {
+        *failed += 1;
+    }
+    if since.elapsed() < Duration::from_secs(10) {
+        return;
+    }
+    times.sort_unstable();
+    let at = |q: f64| times[((times.len() - 1) as f64 * q) as usize] as f64 / 1000.0;
+    warn!(
+        "ST3215 read stats: n={} failed={} p50={:.2}ms p90={:.2}ms p99={:.2}ms p99.9={:.2}ms max={:.2}ms",
+        times.len(), failed, at(0.5), at(0.9), at(0.99), at(0.999), at(1.0)
+    );
+    *guard = None;
 }
