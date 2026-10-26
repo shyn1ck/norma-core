@@ -27,6 +27,7 @@ jobs:
         shell: bash
         run: |
           cargo update -p normfs -p normfs-types -p normfs-time 2>&1 | tail -3 || true
+          cargo update -p cmake 2>&1 | tail -3 || true
           cargo build --release -p station > build.log 2>&1 && echo "build ok" || echo "build FAILED"
           { grep -E "^error|error\[|error C[0-9]+|^warning: unused|fatal error" build.log | sort | uniq -c | head -60; } || true
           { grep -E "^error" -A12 build.log | head -150; } || true
