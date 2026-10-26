@@ -37,3 +37,15 @@ log = "0.4.28"
 parking_lot = "0.12"
 lazy_static = "1.5"
 tokio-serial = "5.4.5"
+
+# probe only: the normfs Windows branch
+[patch.crates-io]
+normfs = { git = "https://github.com/shyn1ck/normfs", branch = "feat/windows-disk-monitor" }
+normfs-types = { git = "https://github.com/shyn1ck/normfs", branch = "feat/windows-disk-monitor" }
+normfs-time = { git = "https://github.com/shyn1ck/normfs", branch = "feat/windows-disk-monitor" }
+normfs-fs = { git = "https://github.com/shyn1ck/normfs", branch = "feat/windows-disk-monitor" }
+normfs-wal = { git = "https://github.com/shyn1ck/normfs", branch = "feat/windows-disk-monitor" }
+normfs-store = { git = "https://github.com/shyn1ck/normfs", branch = "feat/windows-disk-monitor" }
+normfs-crypto = { git = "https://github.com/shyn1ck/normfs", branch = "feat/windows-disk-monitor" }
+normfs-cloud = { git = "https://github.com/shyn1ck/normfs", branch = "feat/windows-disk-monitor" }
+uintn = { git = "https://github.com/shyn1ck/normfs", branch = "feat/windows-disk-monitor" }
