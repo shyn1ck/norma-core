@@ -35,13 +35,16 @@ jobs:
       - name: run
         shell: bash
         run: |
-          ls -la target/release/station.exe || exit 1
-          ./target/release/station.exe --help | head -5
+          set +e
+          ls -la target/release/station.exe
           cd "$RUNNER_TEMP"
           "$GITHUB_WORKSPACE/target/release/station.exe" --config "$GITHUB_WORKSPACE/.github/probe/station.yaml" --data-dir "$RUNNER_TEMP/sd" --tcp 127.0.0.1:8888 --web 127.0.0.1:8889 > station.log 2>&1 &
-          sleep 20
-          echo "== web"; curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8889/ || true
-          echo "== normfs tcp"; python "$GITHUB_WORKSPACE/.github/probe/live.py" e2e || true
+          pid=$!
+          sleep 25
+          echo "== alive: $(kill -0 $pid 2>/dev/null && echo yes || echo no)"
+          echo "== log"; head -60 station.log
+          echo "== web"; curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8889/
+          echo "== normfs tcp"; python "$GITHUB_WORKSPACE/.github/probe/live.py" e2e
           echo "== data"; find "$RUNNER_TEMP/sd" -maxdepth 4 | head -30
-          echo "== log"; { grep -E "ERROR|WARN|panick" station.log | head -30; } || true
-          tail -15 station.log
+          echo "== log tail"; tail -20 station.log
+          exit 0
