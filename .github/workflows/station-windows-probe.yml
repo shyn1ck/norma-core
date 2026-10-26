@@ -38,7 +38,7 @@ jobs:
           set +e
           ls -la target/release/station.exe
           cd "$RUNNER_TEMP"
-          "$GITHUB_WORKSPACE/target/release/station.exe" --config "$GITHUB_WORKSPACE/.github/probe/station.yaml" --data-dir "$RUNNER_TEMP/sd" --tcp 127.0.0.1:8888 --web 127.0.0.1:8889 > station.log 2>&1 &
+          "$GITHUB_WORKSPACE/target/release/station.exe" --config "$GITHUB_WORKSPACE/.github/probe/station.yaml" --normfs-base-folder "$RUNNER_TEMP/sd" --tcp 127.0.0.1:8888 --web 127.0.0.1:8889 > station.log 2>&1 &
           pid=$!
           sleep 25
           echo "== alive: $(kill -0 $pid 2>/dev/null && echo yes || echo no)"
