@@ -139,8 +139,11 @@ impl Inference {
         let latest_pointers = self.latest_pointers.clone();
         let registrations = self.registrations.clone();
         let gate = self.gate.clone();
+        // Taken under the entry lock, so a concurrent register cannot publish an older token.
+        let mut entry = registrations.entry(queue_path.clone()).or_insert(0);
         let registration = self.next_registration.fetch_add(1, Ordering::Relaxed);
-        registrations.insert(queue_path.clone(), registration);
+        *entry = registration;
+        drop(entry);
 
         log::info!(
             "Inference: registering queue '{}' with type {}",
@@ -172,6 +175,8 @@ impl Inference {
                 );
             }
             Err(e) => {
+                self.registrations
+                    .remove_if(queue_id.as_str(), |_, live| *live == registration);
                 log::error!("Failed to subscribe to queue '{}': {:?}", queue_id, e);
             }
         }
