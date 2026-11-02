@@ -1,7 +1,7 @@
 name: station-windows-full
 on:
   push:
-    branches: [ci/station-windows-full]
+    branches: [ci/station-windows-full, ci/station-windows-final]
   workflow_dispatch:
 env:
   CARGO_TERM_COLOR: never
