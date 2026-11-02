@@ -100,8 +100,10 @@ jobs:
           echo "== go client"; "$RUNNER_TEMP/goe2e.exe" 127.0.0.1:8888 || ok=0
           kill -0 $pid 2>/dev/null || { echo "== DIED during checks"; ok=0; }
           echo "== errors in log"; grep -nE "ERROR|panicked" station.log | head -40
-          taskkill //PID $pid //F > /dev/null 2>&1
-          sleep 2
+          # $pid is the bash job, not station.exe; a hard kill also tests recovery after a crash.
+          taskkill //IM station.exe //F
+          for i in $(seq 40); do tasklist | grep -qi station.exe || break; sleep 0.5; done
+          tasklist | grep -qi station.exe && { echo "== station.exe still running"; ok=0; }
           [ $ok = 1 ]
       - name: restart on the same data, then ctrl-break
         shell: bash
