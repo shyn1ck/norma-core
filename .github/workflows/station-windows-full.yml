@@ -61,12 +61,11 @@ jobs:
       - name: build station
         shell: bash
         run: |
-          n="$(pwd -W)/normfs-src"
+          u="https://github.com/shyn1ck/normfs"
           p=()
-          for c in normfs normfs-types normfs-time normfs-fs normfs-wal normfs-store normfs-crypto normfs-cloud; do
-            p+=(--config "patch.crates-io.$c.path='$n/$c'")
+          for c in normfs normfs-types normfs-time normfs-fs normfs-wal normfs-store normfs-crypto normfs-cloud uintn; do
+            p+=(--config "patch.crates-io.$c.git='$u'" --config "patch.crates-io.$c.branch='$NORMFS_REF'")
           done
-          p+=(--config "patch.crates-io.uintn.path='$n/uintn-rs'")
           cargo update "${p[@]}" -p normfs -p normfs-types -p normfs-time
           cargo build --release -p station "${p[@]}" 2>&1 | tee build.log | grep -E "^(warning|error)" -A6 || true
           test -f target/release/station.exe
