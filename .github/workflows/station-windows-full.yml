@@ -128,7 +128,7 @@ jobs:
           cp "$GITHUB_WORKSPACE/software/station/bin/station/station.yaml" .
           HOLD=15 python "$GITHUB_WORKSPACE/.github/probe/shutdown.py" "$GITHUB_WORKSPACE/target/release/station.exe" station.log --config station.yaml --normfs-base-folder "$RUNNER_TEMP/sd2" --tcp 127.0.0.1:8888 --web 127.0.0.1:8889
           s=$?
-          echo "== log"; head -80 station.log
+          echo "== log"; grep -vE "INFO  normfs(\]|_wal|-|::disk)|=====" station.log | tail -60
           echo "== errors"; grep -nE "ERROR|panicked" station.log | head -40
           echo "== data"; find "$RUNNER_TEMP/sd2" -maxdepth 3 | head -40
           [ $s = 0 ]
