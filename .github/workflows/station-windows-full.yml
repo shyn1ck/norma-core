@@ -6,6 +6,7 @@ on:
 env:
   CARGO_TERM_COLOR: never
   NORMFS_REF: wip/tcp-win2
+  E2E_PREFIX: e2evideo/
 jobs:
   viewer:
     runs-on: ubuntu-latest

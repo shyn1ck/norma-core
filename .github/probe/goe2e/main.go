@@ -23,6 +23,14 @@ func payload(i, n int) []byte {
 
 func fail(f string, a ...any) { fmt.Printf("FAIL "+f+"\n", a...); os.Exit(1) }
 
+// Station puts large records only in queues its video rule matches.
+var prefix = func() string {
+	if p := os.Getenv("E2E_PREFIX"); p != "" {
+		return p
+	}
+	return "e2e/"
+}()
+
 var sizes = []int{1, 17, 1024, 4000, 65535, 65536, 65537, 200 * 1024, 1 << 20, 3 << 20}
 
 func packed() [][]byte {
@@ -41,7 +49,7 @@ func verify(c nfs.Client) {
 	}
 	want = append(want, packed()...)
 	want = append(want, []byte("after idle"))
-	r := c.ReadFromTail("e2e/main", uintn.FromU64(uint64(len(want))), uint64(len(want)), 1, 16)
+	r := c.ReadFromTail(prefix + "main", uintn.FromU64(uint64(len(want))), uint64(len(want)), 1, 16)
 	got := 0
 	for e := range r.Data {
 		if e.Err != nil {
@@ -69,7 +77,7 @@ func main() {
 		verify(c)
 		return
 	}
-	q := "e2e/main"
+	q := prefix + "main"
 	var want [][]byte
 	var ids []uintn.UintN
 	for i, n := range sizes {
@@ -114,12 +122,12 @@ func main() {
 	if r.Err != nil || got != 5 {
 		fail("read from tail: err=%v got=%d", r.Err, got)
 	}
-	r = c.ReadFromOffset("e2e/missing", ids[0], 1, 1, 0)
+	r = c.ReadFromOffset(prefix + "missing", ids[0], 1, 1, 0)
 	for range r.Data {
 	}
 	fmt.Printf("missing queue read err: %v\n", r.Err)
 
-	fq := "e2e/follow"
+	fq := prefix + "follow"
 	if _, err := c.Enqueue(fq, []byte("seed")); err != nil {
 		fail("seed: %v", err)
 	}
@@ -171,7 +179,7 @@ func main() {
 				errs.Add(M)
 				return
 			}
-			qq := fmt.Sprintf("e2e/load/%d", k%20)
+			qq := fmt.Sprintf(prefix+"load/%d", k%20)
 			for i := 0; i < M; i++ {
 				if _, err := cc.Enqueue(qq, payload(k, 64+i)); err != nil {
 					errs.Add(1)
