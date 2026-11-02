@@ -1,0 +1,139 @@
+name: station-windows-full
+on:
+  push:
+    branches: [ci/station-windows-full]
+  workflow_dispatch:
+env:
+  CARGO_TERM_COLOR: never
+  NORMFS_REF: wip/tcp-win2
+jobs:
+  viewer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: software/station/clients/station-viewer/package-lock.json
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: build viewer
+        working-directory: software/station/clients/station-viewer
+        run: npm ci && npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: viewer-dist
+          path: software/station/clients/station-viewer/dist
+          retention-days: 3
+
+  windows:
+    needs: viewer
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: shyn1ck/normfs
+          ref: ${{ env.NORMFS_REF }}
+          path: normfs-src
+      - uses: actions/download-artifact@v4
+        with:
+          name: viewer-dist
+          path: software/station/clients/station-viewer/dist
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.6"
+      - name: nasm
+        shell: bash
+        run: |
+          curl -sSL -o nasm.zip https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip
+          unzip -q nasm.zip -d nasm && echo "$PWD/nasm/nasm-2.16.03" >> $GITHUB_PATH
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: station-windows-full
+      - name: build station
+        shell: bash
+        run: |
+          n="$PWD/normfs-src"
+          p=()
+          for c in normfs normfs-types normfs-time normfs-fs normfs-wal normfs-store normfs-crypto normfs-cloud; do
+            p+=(--config "patch.crates-io.$c.path='$n/$c'")
+          done
+          p+=(--config "patch.crates-io.uintn.path='$n/uintn-rs'")
+          cargo update "${p[@]}" -p normfs -p normfs-types -p normfs-time
+          cargo build --release -p station "${p[@]}" 2>&1 | tee build.log | grep -E "^(warning|error)" -A6 || true
+          test -f target/release/station.exe
+          cargo clippy -p usbvideo "${p[@]}" 2>&1 | grep -E "^(warning|error)" -A8 | head -80 || true
+      - name: build e2e client
+        shell: bash
+        working-directory: .github/probe/goe2e
+        run: go build -o "$RUNNER_TEMP/goe2e.exe" .
+      - name: run with no config file
+        shell: bash
+        run: |
+          set +e
+          cd "$RUNNER_TEMP"; mkdir -p run1 && cd run1
+          exe="$GITHUB_WORKSPACE/target/release/station.exe"
+          "$exe" --normfs-base-folder "$RUNNER_TEMP/sd1" --tcp 127.0.0.1:8888 --web 127.0.0.1:8889 > station.log 2>&1 &
+          pid=$!
+          sleep 20
+          ok=1
+          kill -0 $pid 2>/dev/null && echo "== alive" || { echo "== DIED"; ok=0; }
+          echo "== startup log"; head -80 station.log
+          code=$(curl -s -o index.html -w "%{http_code}" http://127.0.0.1:8889/)
+          echo "== web / $code, $(wc -c < index.html) bytes, scripts: $(grep -c '<script' index.html)"
+          [ "$code" = 200 ] && grep -q '<script' index.html || ok=0
+          echo "== tcp probe"; python "$GITHUB_WORKSPACE/.github/probe/live.py" e2e | tee probe.txt
+          grep -q "ALL OK" probe.txt || ok=0
+          echo "== go client"; "$RUNNER_TEMP/goe2e.exe" 127.0.0.1:8888 || ok=0
+          kill -0 $pid 2>/dev/null || { echo "== DIED during checks"; ok=0; }
+          echo "== errors in log"; grep -nE "ERROR|panicked" station.log | head -40
+          taskkill //PID $pid //F > /dev/null 2>&1
+          sleep 2
+          [ $ok = 1 ]
+      - name: restart on the same data, then ctrl-break
+        shell: bash
+        run: |
+          set +e
+          cd "$RUNNER_TEMP/run1"
+          exe="$GITHUB_WORKSPACE/target/release/station.exe"
+          HOLD=1 python "$GITHUB_WORKSPACE/.github/probe/shutdown.py" "$exe" restart.log --normfs-base-folder "$RUNNER_TEMP/sd1" --tcp 127.0.0.1:8888 --web 127.0.0.1:8889 &
+          sp=$!
+          for i in $(seq 60); do python -c "import socket;socket.create_connection(('127.0.0.1',8888),1)" 2>/dev/null && break; sleep 0.5; done
+          "$RUNNER_TEMP/goe2e.exe" 127.0.0.1:8888 verify; v=$?
+          wait $sp; s=$?
+          echo "== shutdown log"; tail -25 restart.log
+          grep -q "NormFS closed successfully" restart.log && echo "== NormFS closed cleanly" || s=1
+          [ $v = 0 ] && [ $s = 0 ]
+      - name: repo station.yaml
+        shell: bash
+        run: |
+          set +e
+          cd "$RUNNER_TEMP"; mkdir -p run2 && cd run2
+          cp "$GITHUB_WORKSPACE/software/station/bin/station/station.yaml" .
+          HOLD=15 python "$GITHUB_WORKSPACE/.github/probe/shutdown.py" "$GITHUB_WORKSPACE/target/release/station.exe" station.log --config station.yaml --normfs-base-folder "$RUNNER_TEMP/sd2" --tcp 127.0.0.1:8888 --web 127.0.0.1:8889
+          s=$?
+          echo "== log"; head -80 station.log
+          echo "== errors"; grep -nE "ERROR|panicked" station.log | head -40
+          echo "== data"; find "$RUNNER_TEMP/sd2" -maxdepth 3 | head -40
+          [ $s = 0 ]
+      - name: package
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p dist-out && cp target/release/station.exe dist-out/ 2>/dev/null
+          cp software/station/bin/station/station.yaml dist-out/
+          cp "$RUNNER_TEMP"/run1/*.log "$RUNNER_TEMP"/run2/*.log dist-out/ 2>/dev/null; true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: station-windows-amd64
+          path: dist-out
+          retention-days: 14
