@@ -136,9 +136,18 @@ jobs:
         if: always()
         shell: bash
         run: |
-          mkdir -p dist-out && cp target/release/station.exe dist-out/ 2>/dev/null
-          cp software/station/bin/station/station.yaml dist-out/
-          cp "$RUNNER_TEMP"/run1/*.log "$RUNNER_TEMP"/run2/*.log dist-out/ 2>/dev/null; true
+          set +e
+          mkdir -p dist-out logs-out
+          cp target/release/station.exe software/station/bin/station/station.yaml dist-out/
+          for d in run1 run2; do cp "$RUNNER_TEMP/$d/"*.log logs-out/ 2>/dev/null; done
+          ls -la dist-out logs-out
+          test -f dist-out/station.exe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: station-logs
+          path: logs-out
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         if: always()
         with:
