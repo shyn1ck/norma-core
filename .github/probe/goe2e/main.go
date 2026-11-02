@@ -23,7 +23,7 @@ func payload(i, n int) []byte {
 
 func fail(f string, a ...any) { fmt.Printf("FAIL "+f+"\n", a...); os.Exit(1) }
 
-// Station puts large records only in queues its video rule matches.
+// Station takes large records only in queues on active pages, such as inference/*.
 var prefix = func() string {
 	if p := os.Getenv("E2E_PREFIX"); p != "" {
 		return p

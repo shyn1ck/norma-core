@@ -6,7 +6,7 @@ on:
 env:
   CARGO_TERM_COLOR: never
   NORMFS_REF: wip/tcp-win2
-  E2E_PREFIX: e2evideo/
+  E2E_PREFIX: inference/e2e/
 jobs:
   viewer:
     runs-on: ubuntu-latest
@@ -101,6 +101,7 @@ jobs:
           kill -0 $pid 2>/dev/null || { echo "== DIED during checks"; ok=0; }
           echo "== errors in log"; grep -nE "ERROR|panicked" station.log | head -40
           # $pid is the bash job, not station.exe; a hard kill also tests recovery after a crash.
+          sleep 3
           taskkill //IM station.exe //F
           for i in $(seq 40); do tasklist | grep -qi station.exe || break; sleep 0.5; done
           tasklist | grep -qi station.exe && { echo "== station.exe still running"; ok=0; }
