@@ -61,7 +61,7 @@ jobs:
       - name: build station
         shell: bash
         run: |
-          n="$PWD/normfs-src"
+          n="$(pwd -W)/normfs-src"
           p=()
           for c in normfs normfs-types normfs-time normfs-fs normfs-wal normfs-store normfs-crypto normfs-cloud; do
             p+=(--config "patch.crates-io.$c.path='$n/$c'")
