@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 env:
   CARGO_TERM_COLOR: never
-  NORMFS_REF: wip/tcp-win2
+  NORMFS_REF: feat/server-tcp-windows
   E2E_PREFIX: inference/e2e/
 jobs:
   viewer:
