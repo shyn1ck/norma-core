@@ -67,7 +67,10 @@ jobs:
             p+=(--config "patch.crates-io.$c.git='$u'" --config "patch.crates-io.$c.branch='$NORMFS_REF'")
           done
           cargo update "${p[@]}" -p normfs -p normfs-types -p normfs-time
-          cargo build --release -p station "${p[@]}" 2>&1 | tee build.log | grep -E "^(warning|error)" -A6 || true
+          # cmake 0.1.54 passes flags the VS 2022 generator rejects when building turbojpeg.
+          cargo update "${p[@]}" -p cmake
+          cargo build --release -p station "${p[@]}" > build.log 2>&1 || { grep -E "^(warning|error)|panicked|CMake Error|error C|LNK" -A12 build.log | head -150; exit 1; }
+          grep -E "^warning" -A6 build.log | head -60 || true
           test -f target/release/station.exe
           cargo clippy -p usbvideo "${p[@]}" 2>&1 | grep -E "^(warning|error)" -A8 | head -80 || true
       - name: build e2e client
